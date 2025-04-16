@@ -20,6 +20,8 @@ class CustomUserAdmin(UserAdmin):
         }),
     )
 
+    readonly_fields = ['modified_at']
+
 @admin.register(FieldChoices)
 class FieldChoicesAdmin(admin.ModelAdmin):
     list_display = ('field',)
