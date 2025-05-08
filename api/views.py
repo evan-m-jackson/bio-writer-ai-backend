@@ -73,3 +73,32 @@ class UserBioViewSet(viewsets.ModelViewSet):
         if not self.request.user.is_staff:
             return UserBio.objects.filter(user_id=self.request.user.id)
         return UserBio.objects.all()
+
+class ProfileDataView(APIView):
+    def get(self, request, user_id):
+        try:
+            user = Users.objects.get(id=user_id)
+        except Users.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        fields = UserFields.objects.filter(user=user)
+        
+        try:
+            achievements = UserAchievements.objects.get(user=user)
+            achievements_data = UserAchievementSerializer(achievements).data 
+        except UserAchievements.DoesNotExist:
+            achievements_data = {}
+
+        try:
+            bio = UserBio.objects.get(user=user)
+            bio_data = UserBioSerializer(bio).data 
+        except UserBio.DoesNotExist:
+            bio_data = {}
+
+        data = {
+            'fields': UserFieldsSerializer(fields, many=True).data,
+            'achievements': achievements_data,
+            'bio': bio_data,
+        }
+
+        return Response(data, status=status.HTTP_200_OK)

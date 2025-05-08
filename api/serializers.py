@@ -39,3 +39,8 @@ class UserBioSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserBio
         fields = ['id', 'user', 'bio']
+
+class ProfileDataSerializer(serializers.Serializer):
+    fields = UserFieldsSerializer(many=True)
+    achievement = UserAchievementSerializer()
+    bio = UserBioSerializer()
