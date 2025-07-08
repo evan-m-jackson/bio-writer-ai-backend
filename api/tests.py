@@ -439,7 +439,7 @@ class TestUserBioViewSet:
 
     @pytest.mark.django_db
     def test_get_user_bio_fails_when_not_authenticated(self, api_client, create_user):
-        UserAchievements.objects.create(
+        UserBio.objects.create(
             user=create_user,
             bio='User has been an award winning developer for 5 years'
         )
@@ -466,7 +466,7 @@ class TestProfileDataView:
             bio='Test bio'
         )
 
-        response = api_client.get(f'/api/profile/{create_user.id}/')
+        response = api_client.get(f'/profile-data/{create_user.id}/')
         assert response.status_code == status.HTTP_200_OK
         assert 'fields' in response.data
         assert 'achievements' in response.data
@@ -475,13 +475,13 @@ class TestProfileDataView:
 
     @pytest.mark.django_db
     def test_get_profile_data_user_not_found(self, api_client):
-        response = api_client.get('/api/profile/999/')
+        response = api_client.get('/profile-data/999/')
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert 'error' in response.data
 
     @pytest.mark.django_db
     def test_get_profile_data_no_achievements_or_bio(self, api_client, create_user):
-        response = api_client.get(f"/api/profile/{create_user.id}/")
+        response = api_client.get(f"/profile-data/{create_user.id}/")
         assert response.status_code == status.HTTP_200_OK
         assert response.data['achievements'] == {}
         assert response.data['bio'] == {}
