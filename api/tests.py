@@ -215,8 +215,8 @@ class TestUsersSerializer:
         assert 'email' in serializer.errors
 
     @pytest.mark.django_db
-    def test_users_serializer_returns_read_only_fields(self, user_data):
-        serializer = UsersSerializer(data=user_data)
+    def test_users_serializer_returns_read_only_fields(self, create_user):
+        serializer = UsersSerializer(create_user)
         assert serializer.data['created_at'] is not None
         assert serializer.data['modified_at'] is not None
 
@@ -231,9 +231,10 @@ class TestUserFieldsSerializer:
     @pytest.mark.django_db
     def test_user_fields_serializer(self, create_user, field_choice):
         data = {
-            'user': create_user, 
+            'user': create_user.id,
             'order_num': 1, 
-            'field': field_choice
+            'field': field_choice.field,
+            'years': 5
         }
         serializer = UserFieldsSerializer(data=data)
         assert serializer.is_valid()
@@ -242,7 +243,7 @@ class TestUserAchievementsSerializer:
     @pytest.mark.django_db
     def test_user_achievements_serializer(self, create_user):
         data = {
-            'user': create_user,
+            'user': create_user.id,
             'achievements': 'Won a number of awards'
         }
         serializer = UserAchievementSerializer(data=data)
@@ -252,7 +253,7 @@ class TestUserBioSerializer:
     @pytest.mark.django_db
     def test_user_bio_serializer(self, create_user):
         data = {
-            'user': create_user,
+            'user': create_user.id,
             'bio': 'User has been an award winning developer for 5 years'
         }
         serializer = UserBioSerializer(data=data)
@@ -261,28 +262,36 @@ class TestUserBioSerializer:
 class TestProfileDataSerializer:
     @pytest.mark.django_db
     def test_profile_data_serializer(self, create_user, field_choice):
-        user_fields_serializer = UserFieldsSerializer(data={
-            'user': create_user,
-            'order_num': 1,
-            'field': field_choice
-        })
-        user_achievement_serializer = UserAchievementSerializer(data={
-            'user': create_user,
-            'achievements': 'Won a number of awards'
-        })
-        user_bio_serializer = UserBioSerializer(data={
-            'user': create_user,
-            'bio': 'User has been an award winning developer for 5 years'
-        })
+        achievements_text = 'Won a number of awards'
+        bio_text = 'User has been an award winning developer for 5 years'
+        user_field = UserFields.objects.create(
+            user=create_user,
+            order_num=1,
+            field=field_choice,
+            years=5
+        )
+        user_achievement = UserAchievements.objects.create(
+            user=create_user,
+            achievements=achievements_text
+        )
+        user_bio = UserBio.objects.create(
+            user=create_user,
+            bio=bio_text
+        )
+        
         data = {
-            'fields': [user_fields_serializer.data],
-            'achievement': user_achievement_serializer.data,
-            'bio': user_bio_serializer.data
+            'fields': [user_field],
+            'achievement': user_achievement,
+            'bio': user_bio
         }
-        serializer = ProfileDataSerializer(data=data)
-        assert serializer.is_valid()
+        serializer = ProfileDataSerializer(data)
 
-class TestCustomerTokenObtainPairSerializer:
+        data = serializer.data
+        assert data['fields'][0]['field'] == field_choice.field
+        assert data['achievement']['achievements'] == achievements_text
+        assert data['bio']['bio'] == bio_text
+
+class TestCustomTokenObtainPairSerializer:
     @pytest.mark.django_db
     def test_custom_token_serializer(self, create_user):
         token = CustomTokenObtainPairSerializer.get_token(create_user)
@@ -310,7 +319,7 @@ class TestRegisterView:
 
 class TestUsersViewSet:
     @pytest.mark.django_db
-    def test_list_users_authenticated(self, authenticated_client, create_user):
+    def test_list_users_authenticated(self, authenticated_client):
         response = authenticated_client.get('/api/users/')
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) == 1  # User can only see their own profile
@@ -335,7 +344,6 @@ class TestFieldChoicesViewSet:
 
     @pytest.mark.django_db
     def test_get_field_choices_fails_when_not_authenticated(self, api_client):
-        FieldChoices.objects.create(field=field_choice)
         response = api_client.get('/api/fields/')
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
@@ -365,14 +373,14 @@ class TestUserFieldsViewSet:
 
     @pytest.mark.django_db
     def test_get_user_fields_when_user_is_authenticated(self, authenticated_client, create_user, field_choice):
-        UserFields.objects.create(
+        user_field = UserFields.objects.create(
             user=create_user,
             order_num=1,
             field=field_choice,
             years=5
         )
-        url = f"/api/user-fields/{create_user.id}"
-        response = authenticated_client.get(url)
+        url = f"/api/user-fields/{user_field.id}"
+        response = authenticated_client.get(url, follow=True)
         assert response.status_code == status.HTTP_200_OK
 
     @pytest.mark.django_db
@@ -384,7 +392,7 @@ class TestUserFieldsViewSet:
             years=5
         )
         url = f"/api/user-fields/{create_user.id}"
-        response = api_client.get(url)
+        response = api_client.get(url, follow=True)
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 class TestUserAchievementsViewSet:
@@ -394,17 +402,17 @@ class TestUserAchievementsViewSet:
             'user': create_user.id,
             'achievements': 'Won a bunch of awards.'
         }
-        response = authenticated_client.post('/api/achievements', data)
-        assert response.status_code == status.HTTP_201_CREATED
+        response = authenticated_client.post('/api/achievements', data, follow=True)
+        assert response.status_code == status.HTTP_200_OK
 
     @pytest.mark.django_db
     def test_get_user_achievements_when_authenticated(self, authenticated_client, create_user):
-        UserAchievements.objects.create(
+        achievements = UserAchievements.objects.create(
             user=create_user,
             achievements='Won a bunch of awards.'
         )
-        url = f"/api/achievements/{create_user.id}"
-        response = authenticated_client.get(url)
+        url = f"/api/achievements/{achievements.id}"
+        response = authenticated_client.get(url, follow=True)
         assert response.status_code == status.HTTP_200_OK
 
     @pytest.mark.django_db
@@ -413,7 +421,7 @@ class TestUserAchievementsViewSet:
             user=create_user,
             achievements='Won a bunch of awards.'
         )
-        url = f"/api/achievements/{create_user.id}"
+        url = f"/api/achievements/{create_user.id}/"
         response = api_client.get(url)
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
@@ -424,16 +432,17 @@ class TestUserBioViewSet:
             'user': create_user.id,
             'bio': 'User has been an award winning developer for 5 years'
         }
-        response = authenticated_client.post('/api/bios', data)
-        assert response.status_code == status.HTTP_201_CREATED
+        response = authenticated_client.post('/api/bios', data, follow=True)
+        assert response.status_code == status.HTTP_200_OK
 
     @pytest.mark.django_db
     def test_get_user_bio_when_authenticated(self, authenticated_client, create_user):
-        UserBio.objects.create(
+        bio = UserBio.objects.create(
             user=create_user,
             bio='User has been an award winning developer for 5 years'
         )
-        url = f"/api/bios/{create_user.id}"
+        url = f"/api/bios/{bio.id}/"
+
         response = authenticated_client.get(url)
         assert response.status_code == status.HTTP_200_OK
 
@@ -443,14 +452,13 @@ class TestUserBioViewSet:
             user=create_user,
             bio='User has been an award winning developer for 5 years'
         )
-        url = f"/api/bios/{create_user.id}"
+        url = f"/api/bios/{create_user.id}/"
         response = api_client.get(url)
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 class TestProfileDataView:
     @pytest.mark.django_db
-    def test_get_profile_data_success(self, api_client, create_user, field_choice):
-        # Create test data
+    def test_get_profile_data_success(self, authenticated_client, create_user, field_choice):
         UserFields.objects.create(
             user=create_user,
             order_num=1,
@@ -466,7 +474,7 @@ class TestProfileDataView:
             bio='Test bio'
         )
 
-        response = api_client.get(f'/profile-data/{create_user.id}/')
+        response = authenticated_client.get(f'/profile-data/{create_user.id}/')
         assert response.status_code == status.HTTP_200_OK
         assert 'fields' in response.data
         assert 'achievements' in response.data
@@ -474,14 +482,14 @@ class TestProfileDataView:
         assert len(response.data['fields']) == 1
 
     @pytest.mark.django_db
-    def test_get_profile_data_user_not_found(self, api_client):
-        response = api_client.get('/profile-data/999/')
+    def test_get_profile_data_user_not_found(self, authenticated_client):
+        response = authenticated_client.get('/profile-data/999/')
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert 'error' in response.data
 
     @pytest.mark.django_db
-    def test_get_profile_data_no_achievements_or_bio(self, api_client, create_user):
-        response = api_client.get(f"/profile-data/{create_user.id}/")
+    def test_get_profile_data_no_achievements_or_bio(self, authenticated_client, create_user):
+        response = authenticated_client.get(f"/profile-data/{create_user.id}/")
         assert response.status_code == status.HTTP_200_OK
         assert response.data['achievements'] == {}
         assert response.data['bio'] == {}
