@@ -25,6 +25,13 @@ Start the Django development server:
 python manage.py runserver
 ```
 
+### 4. Running Tests
+Run Pytest
+
+```bash
+pytest api/tests.py -v
+```
+
 The server will start at `http://localhost:8000`
 
 ### Additional Commands
