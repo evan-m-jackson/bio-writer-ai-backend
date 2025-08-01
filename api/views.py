@@ -78,6 +78,7 @@ class ProfileDataView(APIView):
     def get(self, request, user_id):
         try:
             user = Users.objects.get(id=user_id)
+            user_data = UsersSerializer(user).data
         except Users.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -96,6 +97,7 @@ class ProfileDataView(APIView):
             bio_data = {}
 
         data = {
+            'user': user_data,
             'fields': UserFieldsSerializer(fields, many=True).data,
             'achievements': achievements_data,
             'bio': bio_data,

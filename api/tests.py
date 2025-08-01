@@ -280,6 +280,7 @@ class TestProfileDataSerializer:
         )
         
         data = {
+            'user': create_user,
             'fields': [user_field],
             'achievement': user_achievement,
             'bio': user_bio
@@ -287,6 +288,9 @@ class TestProfileDataSerializer:
         serializer = ProfileDataSerializer(data)
 
         data = serializer.data
+        assert data['user']['email'] == create_user.email
+        assert data['user']['first_name'] == create_user.first_name
+        assert data['user']['last_name'] == create_user.last_name
         assert data['fields'][0]['field'] == field_choice.field
         assert data['achievement']['achievements'] == achievements_text
         assert data['bio']['bio'] == bio_text
@@ -476,9 +480,13 @@ class TestProfileDataView:
 
         response = authenticated_client.get(f'/profile-data/{create_user.id}/')
         assert response.status_code == status.HTTP_200_OK
+        assert 'user' in response.data
         assert 'fields' in response.data
         assert 'achievements' in response.data
         assert 'bio' in response.data
+        assert response.data['user']['email'] == create_user.email
+        assert response.data['user']['first_name'] == create_user.first_name
+        assert response.data['user']['last_name'] == create_user.last_name
         assert len(response.data['fields']) == 1
 
     @pytest.mark.django_db
@@ -491,6 +499,10 @@ class TestProfileDataView:
     def test_get_profile_data_no_achievements_or_bio(self, authenticated_client, create_user):
         response = authenticated_client.get(f"/profile-data/{create_user.id}/")
         assert response.status_code == status.HTTP_200_OK
+        assert 'user' in response.data
+        assert response.data['user']['email'] == create_user.email
+        assert response.data['user']['first_name'] == create_user.first_name
+        assert response.data['user']['last_name'] == create_user.last_name
         assert response.data['achievements'] == {}
         assert response.data['bio'] == {}
         assert response.data['fields'] == []
