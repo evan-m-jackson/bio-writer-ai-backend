@@ -347,9 +347,9 @@ class TestFieldChoicesViewSet:
         assert response.status_code == status.HTTP_200_OK
 
     @pytest.mark.django_db
-    def test_get_field_choices_fails_when_not_authenticated(self, api_client):
+    def test_get_field_choices_when_not_authenticated(self, api_client):
         response = api_client.get('/api/fields/')
-        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert response.status_code == status.HTTP_200_OK
 
 class TestUserFieldsViewSet:
     @pytest.mark.django_db
@@ -462,7 +462,7 @@ class TestUserBioViewSet:
 
 class TestProfileDataView:
     @pytest.mark.django_db
-    def test_get_profile_data_success(self, authenticated_client, create_user, field_choice):
+    def test_get_profile_data_success(self, api_client, create_user, field_choice):
         UserFields.objects.create(
             user=create_user,
             order_num=1,
@@ -478,7 +478,7 @@ class TestProfileDataView:
             bio='Test bio'
         )
 
-        response = authenticated_client.get(f'/profile-data/{create_user.id}/')
+        response = api_client.get(f'/profile-data/{create_user.id}/')
         assert response.status_code == status.HTTP_200_OK
         assert 'user' in response.data
         assert 'fields' in response.data
@@ -490,14 +490,14 @@ class TestProfileDataView:
         assert len(response.data['fields']) == 1
 
     @pytest.mark.django_db
-    def test_get_profile_data_user_not_found(self, authenticated_client):
-        response = authenticated_client.get('/profile-data/999/')
+    def test_get_profile_data_user_not_found(self, api_client):
+        response = api_client.get('/profile-data/999/')
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert 'error' in response.data
 
     @pytest.mark.django_db
-    def test_get_profile_data_no_achievements_or_bio(self, authenticated_client, create_user):
-        response = authenticated_client.get(f"/profile-data/{create_user.id}/")
+    def test_get_profile_data_no_achievements_or_bio(self, api_client, create_user):
+        response = api_client.get(f"/profile-data/{create_user.id}/")
         assert response.status_code == status.HTTP_200_OK
         assert 'user' in response.data
         assert response.data['user']['email'] == create_user.email
@@ -506,6 +506,132 @@ class TestProfileDataView:
         assert response.data['achievements'] == {}
         assert response.data['bio'] == {}
         assert response.data['fields'] == []
+
+    @pytest.mark.django_db
+    def test_get_profile_data_without_user_password(self, api_client, create_user):
+        response = api_client.get(f'/profile-data/{create_user.id}/')
+        assert response.status_code == status.HTTP_200_OK
+        assert 'password' not in response.data['user']
+
+class TestAllProfileDataView:
+    @pytest.mark.django_db
+    def test_get_all_profile_data_success(self, api_client):
+        user1 = Users.objects.create_user(
+            email='askywalker@example.com',
+            password='testpass123',
+            first_name='Anakin',
+            last_name='Skywalker'
+        )
+        field1 = FieldChoices.objects.create(field='Jedi')
+        field2 = FieldChoices.objects.create(field='Sith')
+        user1Field1 = UserFields.objects.create(
+            user=user1,
+            order_num=1,
+            field=field1,
+            years=10
+        )
+        user1Field2 = UserFields.objects.create(
+            user=user1,
+            order_num=2,
+            field=field2,
+            years=20
+        )
+        user1Achievemnts = UserAchievements.objects.create(
+            user=user1,
+            achievements="Anakin's achievements"
+        )
+        user1Bio = UserBio.objects.create(
+            user=user1,
+            bio="Anakin's bio"
+        )
+        user2 = Users.objects.create_user(
+            email='pamidala@example.com',
+            password='testpass123',
+            first_name='Padme',
+            last_name='Amidala'    
+        )
+        field3 = FieldChoices.objects.create(field='Queen')
+        field4 = FieldChoices.objects.create(field='Senator')
+        user2Field1 = UserFields.objects.create(
+            user=user2,
+            order_num=1,
+            field=field3,
+            years=4
+        )
+        user2Field2 = UserFields.objects.create(
+            user=user2,
+            order_num=2,
+            field=field4,
+            years=8
+        )
+        user2Achievemnts = UserAchievements.objects.create(
+            user=user2,
+            achievements="Padme's achievements"
+        )
+        user2Bio = UserBio.objects.create(
+            user=user2,
+            bio="Padme's bio"
+        )
+        user3 = Users.objects.create_user(
+            email='lskywalker@example.com',
+            password='testpass123',
+            first_name='Luke',
+            last_name='Skywalker'    
+        )
+        user3Field1 = UserFields.objects.create(
+            user=user3,
+            order_num=1,
+            field=field1,
+            years=30
+        )
+        user3Achievemnts = UserAchievements.objects.create(
+            user=user3,
+            achievements="Luke's achievements"
+        )
+        user3Bio = UserBio.objects.create(
+            user=user3,
+            bio="Luke's bio"
+        )
+        user4 = Users.objects.create_user(
+            email='lorgana@example.com',
+            password='testpass123',
+            first_name='Leia',
+            last_name='Organa'    
+        )
+
+        response = api_client.get('/profile-data/')
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.data) == 4
+        assert response.data[0]['user']['first_name'] == user1.first_name
+        assert response.data[0]['user']['last_name'] == user1.last_name
+        assert response.data[0]['fields'][0]['field'] == user1Field1.field.field
+        assert response.data[0]['fields'][0]['years'] == user1Field1.years
+        assert response.data[0]['fields'][1]['field'] == user1Field2.field.field
+        assert response.data[0]['fields'][1]['years'] == user1Field2.years
+        assert response.data[0]['achievements']['achievements'] == user1Achievemnts.achievements
+        assert response.data[0]['bio']['bio'] == user1Bio.bio
+
+        assert response.data[1]['user']['first_name'] == user2.first_name
+        assert response.data[1]['user']['last_name'] == user2.last_name
+        assert response.data[1]['fields'][0]['field'] == user2Field1.field.field
+        assert response.data[1]['fields'][0]['years'] == user2Field1.years
+        assert response.data[1]['fields'][1]['field'] == user2Field2.field.field
+        assert response.data[1]['fields'][1]['years'] == user2Field2.years
+        assert response.data[1]['achievements']['achievements'] == user2Achievemnts.achievements
+        assert response.data[1]['bio']['bio'] == user2Bio.bio
+
+        assert response.data[2]['user']['first_name'] == user3.first_name
+        assert response.data[2]['user']['last_name'] == user3.last_name
+        assert response.data[2]['fields'][0]['field'] == user3Field1.field.field
+        assert response.data[2]['fields'][0]['years'] == user3Field1.years
+        assert response.data[2]['achievements']['achievements'] == user3Achievemnts.achievements
+        assert response.data[2]['bio']['bio'] == user3Bio.bio
+
+        assert response.data[3]['user']['first_name'] == user4.first_name
+        assert response.data[3]['user']['last_name'] == user4.last_name
+        assert response.data[3]['fields'] == []
+        assert response.data[3]['achievements'] == {}
+        assert response.data[3]['bio'] == {}
 
 class TestDataIntegrity:
     @pytest.mark.django_db

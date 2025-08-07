@@ -39,7 +39,7 @@ class UsersViewSet(viewsets.ModelViewSet):
 class FieldChoicesViewSet(viewsets.ModelViewSet):
     queryset = FieldChoices.objects.all()
     serializer_class = FieldChoicesSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
 class UserFieldsViewSet(viewsets.ModelViewSet):
     queryset = UserFields.objects.all()
@@ -75,6 +75,8 @@ class UserBioViewSet(viewsets.ModelViewSet):
         return UserBio.objects.all()
 
 class ProfileDataView(APIView):
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
     def get(self, request, user_id):
         try:
             user = Users.objects.get(id=user_id)
@@ -104,3 +106,39 @@ class ProfileDataView(APIView):
         }
 
         return Response(data, status=status.HTTP_200_OK)
+
+class AllProfileDataView(APIView):
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get(self, request):
+        users = Users.objects.all()
+        profiles_data = []
+
+        for user in users:
+            # Get user fields
+            fields = UserFields.objects.filter(user=user)
+            fields_data = UserFieldsSerializer(fields, many=True).data
+            
+            # Get achievements (if exists)
+            try:
+                achievements = UserAchievements.objects.get(user=user)
+                achievements_data = UserAchievementSerializer(achievements).data
+            except UserAchievements.DoesNotExist:
+                achievements_data = {}
+            
+            # Get bio (if exists)
+            try:
+                bio = UserBio.objects.get(user=user)
+                bio_data = UserBioSerializer(bio).data
+            except UserBio.DoesNotExist:
+                bio_data = {}
+
+            profile_data = {
+                'user': UsersSerializer(user).data,
+                'fields': fields_data,
+                'achievements': achievements_data,
+                'bio': bio_data,
+            }
+            profiles_data.append(profile_data)
+
+        return Response(profiles_data, status=status.HTTP_200_OK)
