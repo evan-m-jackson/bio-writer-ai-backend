@@ -39,7 +39,7 @@ class UsersViewSet(viewsets.ModelViewSet):
 class FieldChoicesViewSet(viewsets.ModelViewSet):
     queryset = FieldChoices.objects.all()
     serializer_class = FieldChoicesSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
 class UserFieldsViewSet(viewsets.ModelViewSet):
     queryset = UserFields.objects.all()
@@ -75,7 +75,7 @@ class UserBioViewSet(viewsets.ModelViewSet):
         return UserBio.objects.all()
 
 class ProfileDataView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get(self, request, user_id):
         try:
@@ -108,7 +108,7 @@ class ProfileDataView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
 class AllProfileDataView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get(self, request):
         users = Users.objects.all()

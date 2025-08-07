@@ -347,9 +347,9 @@ class TestFieldChoicesViewSet:
         assert response.status_code == status.HTTP_200_OK
 
     @pytest.mark.django_db
-    def test_get_field_choices_fails_when_not_authenticated(self, api_client):
+    def test_get_field_choices_when_not_authenticated(self, api_client):
         response = api_client.get('/api/fields/')
-        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert response.status_code == status.HTTP_200_OK
 
 class TestUserFieldsViewSet:
     @pytest.mark.django_db
